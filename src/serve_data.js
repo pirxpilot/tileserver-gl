@@ -48,6 +48,19 @@ function zip(tile, fn) {
   });
 }
 
+function initZoomRanges(min, max) {
+  var ranges = [];
+  var value = Math.pow(2, min);
+  var i;
+
+  for (i = min; i <= max; i++) {
+    ranges[i] = value;
+    value *= 2;
+  }
+
+  return ranges;
+}
+
 module.exports = function(options, repo, params, id, styles) {
   var app = express().disable('x-powered-by');
 
@@ -55,6 +68,7 @@ module.exports = function(options, repo, params, id, styles) {
   var tileJSON = {
     'tiles': params.domains || options.domains
   };
+  var zoomRanges;
 
   var shrinkers = {};
 
@@ -83,7 +97,7 @@ module.exports = function(options, repo, params, id, styles) {
   if (!mbtilesFileStats.isFile() || mbtilesFileStats.size === 0) {
     throw Error('Not valid MBTiles file: ' + mbtilesFile);
   }
-  var source = new mbtiles(mbtilesFile, function(err) {
+  var source = new mbtiles(mbtilesFile, function() {
     source.getInfo(function(err, info) {
       tileJSON['name'] = id;
       tileJSON['format'] = 'pbf';
@@ -97,6 +111,8 @@ module.exports = function(options, repo, params, id, styles) {
 
       Object.assign(tileJSON, params.tilejson || {});
       utils.fixTileJSONCenter(tileJSON);
+
+      zoomRanges = initZoomRanges(tileJSON.minzoom, tileJSON.maxzoom);
     });
   });
 
@@ -107,6 +123,7 @@ module.exports = function(options, repo, params, id, styles) {
         x = req.params.x | 0,
         y = req.params.y | 0;
     var format = req.params.format;
+
     if (format == options.pbfAlias) {
       format = 'pbf';
     }
@@ -114,11 +131,12 @@ module.exports = function(options, repo, params, id, styles) {
         !(format == 'geojson' && tileJSON.format == 'pbf')) {
       return res.status(404).send('Invalid format');
     }
-    if (z < tileJSON.minzoom || 0 || x < 0 || y < 0 ||
-        z > tileJSON.maxzoom ||
-        x >= Math.pow(2, z) || y >= Math.pow(2, z)) {
+    if (z < tileJSON.minzoom || z > tileJSON.maxzoom
+        || x < 0 || x >= zoomRanges[z]
+        || y < 0 || y >= zoomRanges[z]) {
       return res.status(404).send('Out of bounds');
     }
+
     req.params.format = format;
     req.params.z = z;
     req.params.x = x;
@@ -177,9 +195,6 @@ module.exports = function(options, repo, params, id, styles) {
       return next();
     }
     var tile = req.tile;
-    var x = req.params.x,
-      y = req.params.y,
-      z = req.params.z;
 
     tile.contentType = 'application/json';
     unzip(tile, function(err) {
@@ -187,6 +202,9 @@ module.exports = function(options, repo, params, id, styles) {
         return next(err);
       }
 
+      var x = req.params.x,
+        y = req.params.y,
+        z = req.params.z;
       var vectorTile = new VectorTile(new pbf(tile.data));
       var geojson = {
         "type": "FeatureCollection",
@@ -233,7 +251,7 @@ module.exports = function(options, repo, params, id, styles) {
     sendTile
   );
 
-  app.get('/' + id + '.json', function(req, res, next) {
+  app.get('/' + id + '.json', function(req, res) {
     var info = clone(tileJSON);
     info.tiles = utils.getTileUrls(req, info.tiles,
                                    'data/' + id, info.format, {
