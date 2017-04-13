@@ -93,6 +93,12 @@ module.exports = function(opts, callback) {
   if (opts.cors) {
     app.use(cors());
   }
+  if (opts.cacheControl) {
+    app.use(function(req, res, next) {
+      req.cacheControl = opts.cacheControl;
+      next();
+    });
+  }
 
   Object.keys(config.styles || {}).forEach(function(id) {
     var item = config.styles[id];

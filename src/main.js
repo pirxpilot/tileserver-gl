@@ -7,6 +7,7 @@ var fs = require('fs'),
     request = require('request');
 
 var mbtiles = require('mbtiles');
+var ms = require('ms');
 
 var packageJson = require('../package');
 
@@ -36,6 +37,9 @@ var opts = require('nomnom')
     default: true,
     help: 'Enable Cross-origin resource sharing headers'
   })
+  .option('max-age', {
+    help: 'Configue max-age for Cache-Control header: "5d", "3h", "1y" etc.'
+  })
   .option('verbose', {
     abbr: 'V',
     flag: true,
@@ -54,12 +58,20 @@ var opts = require('nomnom')
 console.log('Starting ' + packageJson.name + ' v' + packageJson.version);
 
 var startServer = function(configPath, config) {
+  var maxAge = opts['max-age'];
+  var cacheControl;
+
+  if (maxAge) {
+    cacheControl = 'public, max-age=' + Math.floor(ms(maxAge) / 1000);
+  }
   return require('./server')({
     configPath: configPath,
     config: config,
     bind: opts.bind,
     port: opts.port,
-    cors: opts.cors
+    cors: opts.cors,
+    maxAge: maxAge,
+    cacheControl: cacheControl
   });
 };
 

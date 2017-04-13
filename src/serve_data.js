@@ -219,6 +219,9 @@ module.exports = function(options, repo, params, id, styles) {
     delete headers['ETag']; // do not trust the tile ETag -- regenerate
     headers['Content-Type'] = req.tile.contentType;
     headers['Content-Encoding'] = 'gzip';
+    if (req.cacheControl) {
+      headers['Cache-Control'] = req.cacheControl;
+    }
     res.set(headers);
 
     res.status(200).send(req.tile.data);
