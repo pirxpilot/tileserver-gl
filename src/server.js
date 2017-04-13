@@ -22,7 +22,8 @@ var packageJson = require('../package'),
     serve_data = require('./serve_data'),
     utils = require('./utils');
 
-var isLight = packageJson.name.slice(-6) == '-light';
+// var isLight = packageJson.name.slice(-6) === '-light';
+var isLight = true;
 if (!isLight) {
   // do not require `serve_rendered` in the light package
   serve_rendered = require('./serve_rendered');
